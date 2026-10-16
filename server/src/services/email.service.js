@@ -1,4 +1,5 @@
 import env from '../config/env.js';
+import { DEFAULT_PARTNERSHIP_INTRO } from '../config/emailTemplates.js';
 
 // NOTE — Phase 5 will replace the body of sendEmail() with a real call to
 // the Resend API (https://api.resend.com/emails) using env.resend.apiKey
@@ -162,6 +163,7 @@ export async function sendPartnershipPaymentEmail({
   depositDate = 'On or before September 1st, 2026',
   paymentMethod = 'Wire Transfer / ACH',
   senderName = 'Bucked Up Management',
+  partnershipIntro = DEFAULT_PARTNERSHIP_INTRO,
 }) {
   const subject = 'Partnership Payment Confirmation';
   const safeRecipientName = escapeHtml(recipientName);
@@ -169,6 +171,7 @@ export async function sendPartnershipPaymentEmail({
   const safePurpose = escapeHtml(purpose);
   const safeDepositDate = escapeHtml(depositDate);
   const safePaymentMethod = escapeHtml(paymentMethod);
+  const safePartnershipIntro = escapeHtml(partnershipIntro);
   const formattedAmount = escapeHtml(formatMoney(amount, currency));
 
   const html = `
@@ -183,6 +186,9 @@ export async function sendPartnershipPaymentEmail({
           <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#47534d;">I hope you’re doing well.</p>
           <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#47534d;">
             I’m reaching out on behalf of the <strong>${safeSenderName}</strong> team to confirm the upcoming payment for our partnership.
+          </p>
+          <p style="margin:0 0 16px; font-size:14px; line-height:1.6; color:#47534d;">
+            ${safePartnershipIntro}
           </p>
 
           <div style="background:#ECF8F1; border:1px solid #D9F0E4; border-radius:12px; padding:18px 20px; margin:20px 0;">

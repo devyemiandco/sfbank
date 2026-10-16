@@ -6,10 +6,37 @@ import AuditLog from '../models/AuditLog.js';
 import User from '../models/User.js';
 import Account from '../models/Account.js';
 import Transaction from '../models/Transaction.js';
+import PartnershipEmailTemplate from '../models/PartnershipEmailTemplate.js';
+import { DEFAULT_PARTNERSHIP_INTRO } from '../config/emailTemplates.js';
 import { signAdminToken } from '../utils/token.js';
 import { generateTransactionReference } from '../utils/generateReference.js';
 import { createNotification } from './notification.service.js';
 import { sendCreditNotification } from './email.service.js';
+
+const PARTNERSHIP_TEMPLATE_KEY = 'partnership-intro';
+
+export async function getPartnershipEmailIntro() {
+  const template = await PartnershipEmailTemplate.findOneAndUpdate(
+    { key: PARTNERSHIP_TEMPLATE_KEY },
+    { $setOnInsert: { intro: DEFAULT_PARTNERSHIP_INTRO } },
+    { new: true, upsert: true, setDefaultsOnInsert: true }
+  );
+  return template.intro;
+}
+
+export async function savePartnershipEmailIntro(intro) {
+  const normalizedIntro = String(intro || '').trim();
+  if (!normalizedIntro || normalizedIntro.length > 500) {
+    throw new AppError('Partnership introduction must be between 1 and 500 characters.', 400);
+  }
+
+  const template = await PartnershipEmailTemplate.findOneAndUpdate(
+    { key: PARTNERSHIP_TEMPLATE_KEY },
+    { $set: { intro: normalizedIntro } },
+    { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+  );
+  return template.intro;
+}
 
 export async function loginAdmin({ email, password }) {
   const normalizedEmail = email.trim().toLowerCase();

@@ -19,8 +19,15 @@ const { default: Account } = await import('../src/models/Account.js');
 const { default: Transaction } = await import('../src/models/Transaction.js');
 const { default: AuditLog } = await import('../src/models/AuditLog.js');
 const { default: Notification } = await import('../src/models/Notification.js');
+const { default: PartnershipEmailTemplate } = await import('../src/models/PartnershipEmailTemplate.js');
 const { transferFunds } = await import('../src/services/transaction.service.js');
-const { reversePendingTransfer } = await import('../src/services/admin.service.js');
+const {
+  getPartnershipEmailIntro,
+  reversePendingTransfer,
+  savePartnershipEmailIntro,
+} = await import('../src/services/admin.service.js');
+const { sendPartnershipPaymentEmail, sendVerificationEmail } = await import('../src/services/email.service.js');
+const { default: env } = await import('../src/config/env.js');
 const protectAdmin = (await import('../src/middleware/adminAuth.middleware.js')).default;
 const { signAccessToken, signAdminToken } = await import('../src/utils/token.js');
 
@@ -29,6 +36,7 @@ async function clearTestRecords() {
     Notification.deleteMany({}),
     AuditLog.deleteMany({}),
     Transaction.deleteMany({}),
+    PartnershipEmailTemplate.deleteMany({}),
     Account.deleteMany({}),
     User.deleteMany({}),
   ]);
@@ -117,12 +125,52 @@ describe('MongoDB transfer integration', { skip: !testMongoUri && 'Set SFB_TEST_
       serverSelectionTimeoutMS: 8000,
     });
     await Promise.all([User.init(), Account.init(), Transaction.init(), AuditLog.init()]);
+    await PartnershipEmailTemplate.init();
   });
 
   beforeEach(clearTestRecords);
   afterEach(clearTestRecords);
   after(async () => {
     if (mongoose.connection.readyState) await mongoose.disconnect();
+  });
+
+  it('persists the edited intro in partnership mail without changing other templates', async () => {
+    const customIntro = 'A saved <partnership> introduction.';
+    const originalFetch = globalThis.fetch;
+    const originalApiKey = env.resend.apiKey;
+    const sentMessages = [];
+    env.resend.apiKey = 'mock-resend-key';
+    globalThis.fetch = async (_url, options) => {
+      sentMessages.push(JSON.parse(options.body));
+      return { ok: true };
+    };
+
+    try {
+      assert.equal(await savePartnershipEmailIntro(customIntro), customIntro);
+      const persistedIntro = await getPartnershipEmailIntro();
+      assert.equal(persistedIntro, customIntro);
+
+      await sendPartnershipPaymentEmail({
+        to: 'partner@example.test',
+        recipientName: 'Jordan Lee',
+        amount: '250.00',
+        currency: 'USD',
+        purpose: 'Creative partnership',
+        depositDate: 'October 16, 2026',
+        paymentMethod: 'Direct transfer',
+        partnershipIntro: persistedIntro,
+      });
+      assert.match(sentMessages[0].html, /A saved &lt;partnership&gt; introduction\./);
+      assert.match(sentMessages[0].html, /\$250\.00/);
+      assert.match(sentMessages[0].html, /Creative partnership/);
+
+      await sendVerificationEmail({ to: 'user@example.test', firstName: 'Jordan', otp: '123456', expiresMinutes: 10 });
+      assert.match(sentMessages[1].html, /Your verification code is:/);
+      assert.doesNotMatch(sentMessages[1].html, /A saved/);
+    } finally {
+      globalThis.fetch = originalFetch;
+      env.resend.apiKey = originalApiKey;
+    }
   });
 
   it('completes an internal transfer with paired ledger entries', async () => {

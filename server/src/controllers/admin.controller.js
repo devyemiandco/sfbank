@@ -73,6 +73,7 @@ export const sendPartnershipMail = catchAsync(async (req, res) => {
     depositDate,
     paymentMethod,
   } = req.body;
+  const partnershipIntro = await adminService.getPartnershipEmailIntro();
 
   const result = await sendPartnershipPaymentEmail({
     to: email,
@@ -83,6 +84,7 @@ export const sendPartnershipMail = catchAsync(async (req, res) => {
     depositDate: depositDate || 'On or before September 1st, 2026',
     paymentMethod: paymentMethod || 'Wire Transfer / ACH',
     senderName: req.admin?.displayName || 'Bucked Up Management',
+    partnershipIntro,
   });
 
   return sendSuccess(res, {
@@ -90,6 +92,16 @@ export const sendPartnershipMail = catchAsync(async (req, res) => {
     devMode: result.devMode || false,
     message: 'Partnership email sent successfully.',
   });
+});
+
+export const getPartnershipEmailIntro = catchAsync(async (_req, res) => {
+  const intro = await adminService.getPartnershipEmailIntro();
+  return sendSuccess(res, { intro });
+});
+
+export const savePartnershipEmailIntro = catchAsync(async (req, res) => {
+  const intro = await adminService.savePartnershipEmailIntro(req.body.intro);
+  return sendSuccess(res, { intro });
 });
 
 export const listAuditLogs = catchAsync(async (_req, res) => {

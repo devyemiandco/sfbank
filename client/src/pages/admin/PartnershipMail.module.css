@@ -17,6 +17,8 @@
 .field label { color:var(--sfb-ink-soft); font-size:12px; font-weight:600; }
 .field select, .dateWrap { height:44px; width:100%; border:1px solid var(--sfb-border-strong); border-radius:var(--radius-md); background:var(--sfb-surface); color:var(--sfb-ink); padding:0 12px; font:inherit; font-size:14px; outline:none; }
 .field select:focus, .dateWrap:focus-within { border-color:var(--sfb-green); box-shadow:0 0 0 3px var(--sfb-green-glow); }
+.introInput { width:100%; min-height:88px; resize:vertical; border:1px solid var(--sfb-border-strong); border-radius:var(--radius-md); background:var(--sfb-surface); color:var(--sfb-ink); padding:11px 12px; font:inherit; font-size:14px; line-height:1.5; outline:none; }
+.introInput:focus { border-color:var(--sfb-green); box-shadow:0 0 0 3px var(--sfb-green-glow); }
 .dateWrap { display:flex; align-items:center; gap:9px; }
 .dateWrap svg { color:var(--sfb-ink-faint); flex-shrink:0; }
 .dateWrap input { min-width:0; border:0; outline:0; background:transparent; color:var(--sfb-ink); font:inherit; font-size:14px; width:100%; }

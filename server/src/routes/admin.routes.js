@@ -4,7 +4,11 @@ import * as adminController from '../controllers/admin.controller.js';
 import protectAdmin from '../middleware/adminAuth.middleware.js';
 import { adminLoginLimiter } from '../middleware/rateLimiter.js';
 import validate from '../middleware/validate.js';
-import { creditAccountValidator, setUserStatusValidator } from '../validators/admin.validator.js';
+import {
+  creditAccountValidator,
+  partnershipEmailIntroValidator,
+  setUserStatusValidator,
+} from '../validators/admin.validator.js';
 
 const router = Router();
 
@@ -32,6 +36,13 @@ router.post(
   ],
   validate,
   adminController.sendPartnershipMail
+);
+router.get('/partnership-mail-template', adminController.getPartnershipEmailIntro);
+router.put(
+  '/partnership-mail-template',
+  partnershipEmailIntroValidator,
+  validate,
+  adminController.savePartnershipEmailIntro
 );
 
 router.get('/users', adminController.listUsers);

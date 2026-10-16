@@ -28,6 +28,16 @@ export function sendPartnershipMail(payload) {
   }));
 }
 
+export async function getPartnershipEmailIntro() {
+  const data = await unwrap(api.get('/admin/partnership-mail-template'));
+  return data.intro;
+}
+
+export async function savePartnershipEmailIntro(intro) {
+  const data = await unwrap(api.put('/admin/partnership-mail-template', { intro }));
+  return data.intro;
+}
+
 export function getOverview() {
   return unwrap(api.get('/admin/overview'));
 }

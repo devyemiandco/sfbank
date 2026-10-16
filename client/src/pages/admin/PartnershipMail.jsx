@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FiArrowUpRight, FiCalendar, FiMail, FiSend } from 'react-icons/fi';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
@@ -32,8 +32,29 @@ function displayDate(date) {
 export default function PartnershipMail() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [sending, setSending] = useState(false);
+  const [intro, setIntro] = useState('');
+  const [savedIntro, setSavedIntro] = useState('');
+  const [loadingIntro, setLoadingIntro] = useState(true);
+  const [savingIntro, setSavingIntro] = useState(false);
   const [error, setError] = useState('');
   const { showToast } = useToast();
+
+  useEffect(() => {
+    let cancelled = false;
+    adminApi.getPartnershipEmailIntro()
+      .then((value) => {
+        if (cancelled) return;
+        setIntro(value);
+        setSavedIntro(value);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err?.response?.data?.message || 'Could not load the partnership email introduction.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingIntro(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   const updateField = (event) => {
     const { name, value } = event.target;
@@ -53,6 +74,21 @@ export default function PartnershipMail() {
       setError(err?.response?.data?.message || 'The email could not be sent. Please try again.');
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleSaveIntro = async () => {
+    setSavingIntro(true);
+    setError('');
+    try {
+      const saved = await adminApi.savePartnershipEmailIntro(intro);
+      setIntro(saved);
+      setSavedIntro(saved);
+      showToast('Partnership email introduction saved.', 'success');
+    } catch (err) {
+      setError(err?.response?.data?.message || 'The introduction could not be saved. Please try again.');
+    } finally {
+      setSavingIntro(false);
     }
   };
 
@@ -76,6 +112,29 @@ export default function PartnershipMail() {
             <div><h2 id="composer-title">Message details</h2><p>Fill in the essentials for this partnership note.</p></div>
           </div>
           <form onSubmit={handleSubmit}>
+            <div className={`${styles.field} ${styles.fullField}`}>
+              <label htmlFor="partnershipIntro">Partnership introduction</label>
+              <textarea
+                id="partnershipIntro"
+                className={styles.introInput}
+                value={intro}
+                onChange={(event) => setIntro(event.target.value)}
+                maxLength={500}
+                rows={3}
+                required
+                disabled={loadingIntro || savingIntro}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleSaveIntro}
+                loading={savingIntro}
+                disabled={loadingIntro || !intro.trim() || intro === savedIntro}
+              >
+                Save introduction
+              </Button>
+            </div>
             <div className={styles.formGrid}>
               <Input label="Recipient email" name="recipientEmail" type="email" value={form.recipientEmail} onChange={updateField} placeholder="name@company.com" required />
               <Input label="Recipient name" name="recipientName" value={form.recipientName} onChange={updateField} placeholder="Jordan Lee" required />
@@ -99,7 +158,14 @@ export default function PartnershipMail() {
               </div>
             </div>
             {error && <p className={styles.error} role="alert">{error}</p>}
-            <Button type="submit" loading={sending} fullWidth><FiSend /> Send partnership email <FiArrowUpRight /></Button>
+            <Button
+              type="submit"
+              loading={sending}
+              disabled={loadingIntro || intro !== savedIntro || !savedIntro}
+              fullWidth
+            >
+              <FiSend /> Send partnership email <FiArrowUpRight />
+            </Button>
           </form>
         </section>
 
@@ -111,7 +177,7 @@ export default function PartnershipMail() {
               <p className={styles.emailKicker}>A note from Bucked Up Management</p>
               <h2 id="preview-title">Good things are<br /><em>worth sharing.</em></h2>
               <p className={styles.greeting}>Hi {firstName},</p>
-              <p>We are pleased to confirm the details of our partnership. The following contribution is scheduled for you:</p>
+              <p>{intro}</p>
               <div className={styles.amountBlock}><span>{form.currency}</span><strong>{displayAmount(form.amount, form.currency).replace(`${form.currency}`, '').trim() || '0.00'}</strong></div>
               <dl className={styles.details}><div><dt>Purpose</dt><dd>{form.purpose || 'Partnership contribution'}</dd></div><div><dt>Scheduled for</dt><dd>{displayDate(form.depositDate)}</dd></div><div><dt>Payment method</dt><dd>{form.paymentMethod}</dd></div></dl>
               <p>Thank you for bringing your energy and expertise to this partnership. We are looking forward to what we create together.</p>
