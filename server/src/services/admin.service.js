@@ -185,18 +185,129 @@ export async function listAllTransactions() {
     .populate({ path: 'account', select: 'accountNumber user', populate: { path: 'user', select: 'firstName lastName' } });
 }
 
+function maskAccountNumber(accountNumber) {
+  if (!accountNumber) return '—';
+  return `${'*'.repeat(Math.max(0, accountNumber.length - 4))}${accountNumber.slice(-4)}`;
+}
+
+export async function listPendingTransfers() {
+  const filter = { type: 'TRANSFER', direction: 'DEBIT', status: 'PENDING' };
+  const [transactions, summary] = await Promise.all([
+    Transaction.find(filter)
+      .sort({ createdAt: -1 })
+      .populate({ path: 'account', select: 'accountNumber user', populate: { path: 'user', select: 'firstName lastName' } }),
+    Transaction.aggregate([
+      { $match: filter },
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: { $add: ['$amount', { $ifNull: ['$fee', 0] }] } } } },
+    ]),
+  ]);
+
+  return {
+    transfers: transactions.map((transaction) => ({
+      id: transaction._id,
+      senderName: transaction.account?.user
+        ? `${transaction.account.user.firstName} ${transaction.account.user.lastName}`
+        : 'Unknown sender',
+      senderAccountNumber: maskAccountNumber(transaction.account?.accountNumber),
+      recipientName: transaction.counterpartyName,
+      recipientAccountNumber: maskAccountNumber(transaction.counterpartyAccountNumber),
+      amount: transaction.amount,
+      fee: transaction.fee || 0,
+      currency: transaction.currency,
+      reference: transaction.reference,
+      createdAt: transaction.createdAt,
+      status: transaction.status,
+    })),
+    summary: { count: summary[0]?.count || 0, total: summary[0]?.total || 0, currency: 'USD' },
+  };
+}
+
+export async function reversePendingTransfer(transactionId, adminEmail) {
+  const session = await mongoose.startSession();
+  let reversal;
+
+  try {
+    await session.withTransaction(async () => {
+      const pendingTransfer = await Transaction.findOneAndUpdate(
+        { _id: transactionId, type: 'TRANSFER', direction: 'DEBIT', status: 'PENDING' },
+        { $set: { status: 'REVERSED' } },
+        { new: true, session }
+      );
+      if (!pendingTransfer) throw new AppError('This transfer is no longer pending.', 409);
+
+      const refundAmount = pendingTransfer.amount + (pendingTransfer.fee || 0);
+      const refundedAccount = await Account.findByIdAndUpdate(
+        pendingTransfer.account,
+        { $inc: { balance: refundAmount } },
+        { new: true, session }
+      );
+      if (!refundedAccount) throw new AppError('The sender account could not be refunded.', 404);
+
+      const reversalDocs = await Transaction.create(
+        [{
+          account: pendingTransfer.account,
+          reference: generateTransactionReference(),
+          direction: 'CREDIT',
+          type: 'TRANSFER',
+          amount: refundAmount,
+          fee: 0,
+          currency: pendingTransfer.currency,
+          status: 'COMPLETED',
+          description: `Refund for pending transfer ${pendingTransfer.reference}`,
+          counterpartyAccountNumber: pendingTransfer.counterpartyAccountNumber,
+          counterpartyName: pendingTransfer.counterpartyName,
+          transferGroupId: pendingTransfer.transferGroupId,
+          performedByAdmin: adminEmail,
+        }],
+        { session }
+      );
+      reversal = reversalDocs[0];
+
+      await AuditLog.create(
+        [{
+          action: 'TRANSFER_REVERSED',
+          admin: adminEmail,
+          target: pendingTransfer.reference,
+          metadata: {
+            transactionId: String(pendingTransfer._id),
+            reversalTransactionId: String(reversal._id),
+            amount: pendingTransfer.amount,
+            fee: pendingTransfer.fee || 0,
+          },
+        }],
+        { session }
+      );
+    });
+  } finally {
+    await session.endSession();
+  }
+
+  return reversal;
+}
+
 export async function listAuditLogs() {
   return AuditLog.find().sort({ createdAt: -1 }).limit(200);
 }
 
 export async function getOverview() {
-  const [totalUsers, activeUsers, disabledUsers, totalTransactions] = await Promise.all([
+  const [totalUsers, activeUsers, disabledUsers, totalTransactions, pendingSummary] = await Promise.all([
     User.countDocuments(),
     User.countDocuments({ status: 'ACTIVE' }),
     User.countDocuments({ status: 'DISABLED' }),
     Transaction.countDocuments(),
+    Transaction.aggregate([
+      { $match: { type: 'TRANSFER', direction: 'DEBIT', status: 'PENDING' } },
+      { $group: { _id: null, count: { $sum: 1 }, total: { $sum: { $add: ['$amount', { $ifNull: ['$fee', 0] }] } } } },
+    ]),
   ]);
 
-  return { totalUsers, activeUsers, disabledUsers, totalTransactions };
+  return {
+    totalUsers,
+    activeUsers,
+    disabledUsers,
+    totalTransactions,
+    pendingTransferCount: pendingSummary[0]?.count || 0,
+    pendingTransferTotal: pendingSummary[0]?.total || 0,
+  };
 }
 

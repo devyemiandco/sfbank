@@ -4,7 +4,7 @@ const auditLogSchema = new mongoose.Schema(
   {
     action: {
       type: String,
-      enum: ['ADMIN_LOGIN', 'ACCOUNT_CREDITED', 'USER_DISABLED', 'USER_ENABLED'],
+      enum: ['ADMIN_LOGIN', 'ACCOUNT_CREDITED', 'TRANSFER_REVERSED', 'USER_DISABLED', 'USER_ENABLED'],
       required: true,
     },
     admin: { type: String, required: true }, // admin email

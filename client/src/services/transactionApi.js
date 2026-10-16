@@ -38,14 +38,16 @@ export async function getTransaction(id) {
   return mapTransaction(data.transaction);
 }
 
-export function transfer({ recipientAccountNumber, amount, currency, description, transactionPin }) {
+export function transfer({ recipientAccountNumber, recipientName, amount, currency, description, transactionPin, idempotencyKey }) {
   return unwrap(
     api.post('/transactions/transfer', {
       recipientAccountNumber,
+      recipientName,
       amount,
       currency,
       description,
       transactionPin,
+      idempotencyKey,
     })
   );
 }

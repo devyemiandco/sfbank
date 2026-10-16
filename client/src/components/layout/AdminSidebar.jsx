@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom';
-import { FiGrid, FiUsers, FiList, FiFileText, FiMail } from 'react-icons/fi';
+import { FiGrid, FiUsers, FiList, FiFileText, FiMail, FiClock } from 'react-icons/fi';
 import styles from './AdminSidebar.module.css';
 
 const LINKS = [
   { to: '/admin/dashboard', label: 'Overview', icon: <FiGrid />, end: true },
   { to: '/admin/users', label: 'Users', icon: <FiUsers /> },
   { to: '/admin/transactions', label: 'Transactions', icon: <FiList /> },
+  { to: '/admin/pending-transfers', label: 'Pending transfers', icon: <FiClock /> },
   { to: '/admin/audit-logs', label: 'Audit Logs', icon: <FiFileText /> },
   { to: '/admin/partnership-mail', label: 'Partnership mail', icon: <FiMail /> },
 ];

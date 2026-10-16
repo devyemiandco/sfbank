@@ -16,7 +16,7 @@ export function isValidPin(pin) {
 }
 
 export function isValidAccountNumber(accountNumber) {
-  return /^1\d{8}$/.test(accountNumber);
+  return /^\d{9,10}$/.test(accountNumber);
 }
 
 export function isValidOtp(otp) {

@@ -13,7 +13,9 @@ const transactionSchema = new mongoose.Schema(
     type: { type: String, enum: ['CREDIT', 'DEBIT', 'TRANSFER'], required: true },
 
     amount: { type: Number, required: true, min: 0 },
+    fee: { type: Number, default: 0, min: 0 },
     currency: { type: String, required: true, default: 'USD' },
+    idempotencyKey: { type: String, default: null },
 
     status: {
       type: String,
@@ -39,5 +41,9 @@ const transactionSchema = new mongoose.Schema(
 );
 
 transactionSchema.index({ account: 1, createdAt: -1 });
+transactionSchema.index(
+  { account: 1, idempotencyKey: 1 },
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
+);
 
 export default mongoose.model('Transaction', transactionSchema);

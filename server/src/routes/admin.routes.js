@@ -41,6 +41,8 @@ router.patch('/users/:id/status', setUserStatusValidator, validate, adminControl
 router.post('/accounts/:id/credit', creditAccountValidator, validate, adminController.creditAccount);
 
 router.get('/transactions', adminController.listTransactions);
+router.get('/pending-transfers', adminController.listPendingTransfers);
+router.post('/pending-transfers/:id/reverse', adminController.reversePendingTransfer);
 router.get('/audit-logs', adminController.listAuditLogs);
 router.get('/overview', adminController.getOverview);
 

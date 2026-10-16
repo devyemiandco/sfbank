@@ -175,6 +175,16 @@
   justify-content: center;
 }
 
+.receiptDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 14px 0 20px;
+  font-size: 13px;
+  color: var(--sfb-ink-soft);
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 480px) {
   .row2 {
     grid-template-columns: 1fr;

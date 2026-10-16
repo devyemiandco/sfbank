@@ -53,6 +53,16 @@ export const listTransactions = catchAsync(async (_req, res) => {
   return sendSuccess(res, { transactions });
 });
 
+export const listPendingTransfers = catchAsync(async (_req, res) => {
+  const data = await adminService.listPendingTransfers();
+  return sendSuccess(res, data);
+});
+
+export const reversePendingTransfer = catchAsync(async (req, res) => {
+  const transaction = await adminService.reversePendingTransfer(req.params.id, req.admin.email);
+  return sendSuccess(res, { transaction });
+});
+
 export const sendPartnershipMail = catchAsync(async (req, res) => {
   const {
     email,

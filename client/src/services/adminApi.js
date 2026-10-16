@@ -72,6 +72,15 @@ export async function listAllTransactions() {
   return data.transactions.map(mapTransaction);
 }
 
+export function listPendingTransfers() {
+  return unwrap(api.get('/admin/pending-transfers'));
+}
+
+export async function reversePendingTransfer(transactionId) {
+  const data = await unwrap(api.post(`/admin/pending-transfers/${transactionId}/reverse`));
+  return data.transaction;
+}
+
 function mapAuditLog(log) {
   return {
     id: log._id,

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FiArrowRight, FiCheckCircle, FiUser } from 'react-icons/fi';
+import { FiArrowRight, FiCheckCircle, FiClock, FiUser } from 'react-icons/fi';
 import Card from '../../components/common/Card';
 import Input from '../../components/common/Input';
 import Button from '../../components/common/Button';
@@ -11,6 +11,7 @@ import { useToast } from '../../context/useToast';
 import * as accountApi from '../../services/accountApi';
 import * as transactionApi from '../../services/transactionApi';
 import { formatCurrency, formatAccountNumber } from '../../utils/formatCurrency';
+import { generateIdempotencyKey } from '../../utils/format';
 import { isValidAccountNumber, isValidPin } from '../../utils/validators';
 import styles from './SendMoney.module.css';
 
@@ -24,7 +25,7 @@ export default function SendMoney() {
   const navigate = useNavigate();
 
   const [step, setStep] = useState(STEPS.FORM);
-  const [form, setForm] = useState({ accountNumber: '', amount: '', currency: 'USD', description: '' });
+  const [form, setForm] = useState({ accountNumber: '', recipientName: '', amount: '', currency: 'USD', description: '' });
   const [errors, setErrors] = useState({});
   const [recipient, setRecipient] = useState(null);
   const [checkingRecipient, setCheckingRecipient] = useState(false);
@@ -32,16 +33,22 @@ export default function SendMoney() {
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [result, setResult] = useState(null);
+  const idempotencyKey = useRef(generateIdempotencyKey());
 
   const handleChange = (e) => {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
+    idempotencyKey.current = generateIdempotencyKey();
     setErrors((er) => ({ ...er, [e.target.name]: '' }));
-    if (e.target.name === 'accountNumber') setRecipient(null);
+    if (e.target.name === 'accountNumber') {
+      setRecipient(null);
+      setForm((f) => ({ ...f, recipientName: '' }));
+    }
   };
 
   const lookupRecipient = async () => {
     if (!isValidAccountNumber(form.accountNumber)) {
-      setErrors((er) => ({ ...er, accountNumber: 'Enter a valid 9-digit account number.' }));
+      setErrors((er) => ({ ...er, accountNumber: 'Account number must be 9 or 10 digits.' }));
       return;
     }
     if (form.accountNumber === account?.accountNumber) {
@@ -52,6 +59,7 @@ export default function SendMoney() {
     try {
       const match = await accountApi.lookupAccount(form.accountNumber);
       setRecipient(match);
+      setForm((current) => ({ ...current, recipientName: '' }));
     } catch (err) {
       setErrors((er) => ({
         ...er,
@@ -65,6 +73,9 @@ export default function SendMoney() {
   const validateForm = () => {
     const next = {};
     if (!recipient) next.accountNumber = 'Look up and confirm a recipient first.';
+    else if (!recipient.found && form.recipientName.trim().length < 2) {
+      next.recipientName = 'Enter the recipient account holder name.';
+    }
     const amt = parseFloat(form.amount);
     if (!amt || amt <= 0) next.amount = 'Enter an amount greater than zero.';
     else if (account && amt > account.balance) next.amount = 'Amount exceeds your available balance.';
@@ -91,17 +102,25 @@ export default function SendMoney() {
     }
     setProcessing(true);
     try {
-      await transactionApi.transfer({
+      const transferResult = await transactionApi.transfer({
         recipientAccountNumber: form.accountNumber,
+        recipientName: recipient?.found ? undefined : form.recipientName.trim(),
         amount: amountNumber,
         currency: form.currency,
         description: form.description,
         transactionPin: pin,
+        idempotencyKey: idempotencyKey.current,
       });
+      setResult(transferResult.debitTransaction);
       await refreshAccount();
       setPinModalOpen(false);
       setStep(STEPS.SUCCESS);
-      showToast('Transfer completed successfully.', 'success');
+      showToast(
+        transferResult.debitTransaction.status === 'PENDING'
+          ? 'Transfer is pending review. Funds have not been delivered.'
+          : 'Transfer completed successfully.',
+        'success'
+      );
     } catch (err) {
       setPinError(err?.response?.data?.message || 'Something went wrong. Please try again.');
     } finally {
@@ -112,13 +131,30 @@ export default function SendMoney() {
   const amountNumber = parseFloat(form.amount) || 0;
 
   if (step === STEPS.SUCCESS) {
+    const isPending = result?.status === 'PENDING';
+    const isReversed = result?.status === 'REVERSED';
     return (
       <Card className={styles.successCard}>
-        <div className={styles.successIcon}><FiCheckCircle size={30} /></div>
-        <h2>Transfer successful</h2>
+        <div className={styles.successIcon}>
+          {isPending ? <FiClock size={30} /> : <FiCheckCircle size={30} />}
+        </div>
+        <h2>{isPending ? 'Transfer pending' : isReversed ? 'Transfer reversed' : 'Transfer successful'}</h2>
         <p>
-          You sent {formatCurrency(amountNumber, form.currency)} to {recipient?.firstName} {recipient?.lastName}.
+          {isPending
+            ? `Funds are held for review. No money has been delivered to ${form.recipientName}.`
+            : isReversed
+              ? 'This transfer was reversed and refunded to your account.'
+              : `You sent ${formatCurrency(amountNumber, form.currency)} to ${recipient?.firstName} ${recipient?.lastName}.`}
         </p>
+        {result && (
+          <div className={styles.receiptDetails}>
+            <span>Status: {result.status}</span>
+            <span>Recipient account: {formatAccountNumber(form.accountNumber)}</span>
+            <span>Amount: {formatCurrency(amountNumber, form.currency)}</span>
+            <span>Fee: {formatCurrency(0, form.currency)}</span>
+            <span>Reference: <strong className="mono">{result.reference}</strong></span>
+          </div>
+        )}
         <div className={styles.successActions}>
           <Button variant="secondary" onClick={() => navigate('/dashboard/transactions')}>View Transactions</Button>
           <Button variant="primary" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
@@ -141,7 +177,9 @@ export default function SendMoney() {
           <FiArrowRight className={styles.previewArrow} />
           <div className={styles.previewCol}>
             <span className={styles.previewLabel}>To</span>
-            <span className={styles.previewName}>{recipient?.firstName} {recipient?.lastName}</span>
+            <span className={styles.previewName}>
+              {recipient?.found ? `${recipient.firstName} ${recipient.lastName}` : form.recipientName}
+            </span>
             <span className="mono">{formatAccountNumber(form.accountNumber)}</span>
           </div>
         </div>
@@ -182,7 +220,7 @@ export default function SendMoney() {
             loading={processing}
             onClick={handlePinSubmit}
           >
-            Confirm & Send
+            Confirm &amp; Send
           </Button>
         </Modal>
       </Card>
@@ -197,9 +235,10 @@ export default function SendMoney() {
             <Input
               label="Recipient account number"
               name="accountNumber"
-              placeholder="1XXXXXXXX"
+              placeholder="9 or 10 digits"
               icon={<FiUser size={16} />}
               value={form.accountNumber}
+              maxLength={10}
               onChange={handleChange}
               error={errors.accountNumber}
             />
@@ -208,10 +247,22 @@ export default function SendMoney() {
             </Button>
           </div>
 
-          {recipient && (
+          {recipient?.found && (
             <div className={styles.recipientBanner}>
               <FiCheckCircle /> {recipient.firstName} {recipient.lastName} — account verified
             </div>
+          )}
+
+          {recipient && !recipient.found && (
+            <Input
+              label="Recipient account holder name"
+              name="recipientName"
+              placeholder="Enter the name provided by the recipient"
+              value={form.recipientName}
+              maxLength={120}
+              onChange={handleChange}
+              error={errors.recipientName}
+            />
           )}
 
           <div className={styles.row2}>

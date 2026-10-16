@@ -29,16 +29,20 @@ export const getMyBalances = catchAsync(async (req, res) => {
  */
 export const lookupAccount = catchAsync(async (req, res) => {
   const { accountNumber } = req.params;
-  if (!/^1\d{8}$/.test(accountNumber)) {
-    throw new AppError('Enter a valid 9-digit account number.', 400);
+  if (!/^\d{9,10}$/.test(accountNumber)) {
+    throw new AppError('Account number must be 9 or 10 digits.', 400);
   }
 
   const account = await getAccountByNumber(accountNumber);
-  if (!account || account.status !== 'ACTIVE') {
+  if (!account) {
+    return sendSuccess(res, { found: false, accountNumber });
+  }
+  if (account.status !== 'ACTIVE') {
     throw new AppError('No active account found with this number.', 404);
   }
 
   return sendSuccess(res, {
+    found: true,
     accountNumber: account.accountNumber,
     firstName: account.user.firstName,
     lastName: account.user.lastName,

@@ -8,6 +8,7 @@
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
     "seed:admin-hash": "node scripts/hashAdminPassword.js",
+    "test": "node --test",
     "lint": "eslint ."
   },
   "license": "ISC",

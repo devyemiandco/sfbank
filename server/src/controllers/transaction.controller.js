@@ -26,16 +26,26 @@ export const transfer = catchAsync(async (req, res) => {
   const account = await getAccountByUserId(req.user._id);
   if (!account) throw new AppError('No account found for this user.', 404);
 
-  const { recipientAccountNumber, amount, currency, description, transactionPin } = req.body;
+  const {
+    recipientAccountNumber,
+    recipientName,
+    amount,
+    currency,
+    description,
+    transactionPin,
+    idempotencyKey,
+  } = req.body;
 
   const result = await transactionService.transferFunds({
     senderUserId: req.user._id,
     senderAccount: account,
     recipientAccountNumber,
+    recipientName,
     amount: Number(amount),
     currency,
     description,
     transactionPin,
+    idempotencyKey,
   });
 
   return sendSuccess(res, result, 201);

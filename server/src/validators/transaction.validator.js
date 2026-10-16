@@ -3,8 +3,19 @@ import { body, query } from 'express-validator';
 export const transferValidator = [
   body('recipientAccountNumber')
     .trim()
-    .matches(/^1\d{8}$/)
-    .withMessage('Enter a valid 9-digit account number.'),
+    .matches(/^\d{9,10}$/)
+    .withMessage('Account number must be 9 or 10 digits.'),
+  body('recipientName')
+    .optional()
+    .trim()
+    .isLength({ min: 2, max: 120 })
+    .withMessage('Recipient name must be between 2 and 120 characters.'),
+  body('idempotencyKey')
+    .notEmpty()
+    .withMessage('Transfer request key is required.')
+    .trim()
+    .isLength({ min: 8, max: 100 })
+    .withMessage('Invalid transfer request key.'),
   body('amount')
     .isFloat({ gt: 0 })
     .withMessage('Amount must be greater than zero.'),

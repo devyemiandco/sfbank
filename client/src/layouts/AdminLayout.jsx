@@ -9,6 +9,7 @@ const TITLES = {
   '/admin/dashboard': 'Overview',
   '/admin/users': 'Users',
   '/admin/transactions': 'Transactions',
+  '/admin/pending-transfers': 'Pending transfers',
   '/admin/audit-logs': 'Audit Logs',
   '/admin/partnership-mail': 'Partnership mail',
 };

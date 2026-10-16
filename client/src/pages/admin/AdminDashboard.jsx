@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiUsers, FiUserCheck, FiUserX, FiList } from 'react-icons/fi';
+import { FiUsers, FiUserCheck, FiUserX, FiList, FiClock } from 'react-icons/fi';
 import Card from '../../components/common/Card';
 import Badge from '../../components/common/Badge';
 import StatCard from '../../components/common/StatCard';
@@ -47,11 +47,19 @@ export default function AdminDashboard() {
         <StatCard label="Active users" value={stats.activeUsers} icon={<FiUserCheck />} />
         <StatCard label="Disabled users" value={stats.disabledUsers} icon={<FiUserX />} tone="danger" />
         <StatCard label="Total transactions" value={stats.totalTransactions} icon={<FiList />} tone="amber" />
+        <StatCard
+          label={`Pending · ${formatCurrency(stats.pendingTransferTotal, 'USD')}`}
+          value={stats.pendingTransferCount}
+          icon={<FiClock />}
+        />
       </div>
 
       <div className={styles.recentHead}>
         <h3>Recent transactions</h3>
-        <Link to="/admin/transactions" className={styles.viewAll}>View all</Link>
+        <div className="flex items-center gap-3">
+          <Link to="/admin/pending-transfers" className={styles.viewAll}>Pending transfers</Link>
+          <Link to="/admin/transactions" className={styles.viewAll}>View all</Link>
+        </div>
       </div>
 
       <Card padded={false}>
